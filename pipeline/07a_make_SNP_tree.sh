@@ -41,7 +41,8 @@ if [ ! -f $FAS ]; then
 	printf '\n'
     done >> $FAS
 fi
-
-FastTreeMP < $FAS > $TREEDIR/$PREFIX.fasttree.tre
+if [ ! -f $TREEDIR/$PREFIX.fasttree.tre ]; then
+ FastTreeMP -gtr -gamma -nt < $FAS > $TREEDIR/$PREFIX.fasttree.tre
+fi
 
 iqtree-omp -nt $CPU -s $FAS -m GTR+ASC -b 100
