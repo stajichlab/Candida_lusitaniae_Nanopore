@@ -2,15 +2,13 @@ library(ggplot2)
 library(RColorBrewer)
 colors1 <- colorRampPalette(brewer.pal(8, "RdYlBu"))
 manualColors = c("dodgerblue2","red1","grey20")
-#library(extrafont) # loaded Arial on mac with instructions here https://github.com/wch/extrafont
-#Clus
 
 bedwindows = read.table("coverage/mosdepth.10000bp.gg.tab.gz",header=F)
 colnames(bedwindows) = c("Chr","Start","End","Depth","Group","Strain")
 #bedwindows = subset(bedwindows,bedwindows$Chr != "MT_CBS_6936") # drop MT for this
 
-bedwindows$CHR <- sub("4606_Chr_","",bedwindows$Chr,perl=TRUE)
-chrlist = c("1","2","2R","3","4", "4R","5","2_6","7","8")
+bedwindows$CHR <- sub("scaffold_","",bedwindows$Chr,perl=TRUE)
+chrlist = 1:8
 d=bedwindows[bedwindows$CHR %in% chrlist, ]
 
 d <- d[order(d$CHR, d$Start), ]
@@ -73,7 +71,7 @@ bedwindows = read.table("coverage/mosdepth.5000bp.gg.tab.gz",header=F)
 colnames(bedwindows) = c("Chr","Start","End","Depth","Group","Strain")
 #bedwindows = subset(bedwindows,bedwindows$Chr != "MT_CBS_6936") # drop MT for this
 
-bedwindows$CHR <- sub("4606_Chr_","",bedwindows$Chr,perl=TRUE)
+bedwindows$CHR <- sub("scaffold_","",bedwindows$Chr,perl=TRUE)
 # reuse chrlist
 d=bedwindows[bedwindows$CHR %in% chrlist, ]
 
@@ -111,29 +109,13 @@ d$Group = factor(d$Group, levels = c("LL", "UL",
 xmax = ceiling(max(d$pos) * 1.03)
 xmin = floor(max(d$pos) * -0.03)
 
-# # test plot one chrom
-# dprime = d[d$CHR %in% 6:6, ]
-# dprime$bp = dprime$Start
-# Title=sprintf("Chr%s depth of coverage","6")
-# p <- ggplot(dprime,
-#             aes(x=bp,y=Depth,color=Group))  +
-#     geom_point(alpha=0.9,size=0.5,shape=16) +
-#     scale_color_manual(values = manualColors) +
-#     labs(title=Title,xlab="Position",y="Normalized Read Depth") +
-#     scale_x_continuous(name="Chromosome bp", expand = c(0, 0)) +
-#     scale_y_continuous(name="Normalized Read Depth", expand = c(0, 0),
-#                        limits = c(0,3)) + theme_classic() +
-#     guides(fill = guide_legend(keywidth = 3, keyheight = 1))
-# p
-
-
-for (strain in unique(d$Strain) ) { 
- l = subset(d,d$Strain == strain)
+plot_strain <- function(strain,data) {
+ l = subset(data,data$Strain == strain)
  Title=sprintf("Chr coverage plot for %s",strain)
  p <- ggplot(l,
             aes(x=pos,y=Depth,color=CHR))  + 
     scale_colour_brewer(palette = "Set3") +
-    geom_point(alpha=0.9,size=0.5,shape=16) +
+    geom_point(alpha=0.9,size=0.8,shape=16) +
     labs(title=Title,xlab="Position",y="Normalized Read Depth") +
     scale_x_continuous(name="Chromosome", expand = c(0, 0),
                        breaks=ticks,
@@ -141,25 +123,27 @@ for (strain in unique(d$Strain) ) {
     scale_y_continuous(name="Normalized Read Depth", expand = c(0, 0),
                        limits = c(0,3)) + theme_classic() +
     guides(fill = guide_legend(keywidth = 3, keyheight = 1))
- ggsave(sprintf("plots/StrainPlot_5kb.%s.pdf",strain),p,width=7,height=2.5)
 }
 
-for (n in chrlist ) {
-    Title=sprintf("Chr%s depth of coverage",n)
- print(Title)
- l <- subset(d,d$CHR==n)
- l$bp <- l$Start
+plts <- lapply(unique(d$Strain),plot_strain,data=d)
+pdf("plots/StrainPlot_5kb.pdf")
+plts
+
+plot_chrs <-function (chrom, data) {
+  Title=sprintf("Chr%s depth of coverage",chrom)
+  l <- subset(data,data$CHR==chrom)
+  l$bp <- l$Start
   p<-ggplot(l,
-           aes(x=bp,y=Depth,color=Group)) +
-        geom_point(alpha=0.7,size=0.75,shape=16) +
-	    scale_color_brewer(palette="RdYlBu",type="seq") +
+            aes(x=bp,y=Depth,color=Strain)) +
+    geom_point(alpha=0.7,size=0.8,shape=16) +
+    # scale_color_brewer(palette="RdYlBu",type="seq") +
     labs(title=Title,xlab="Position",y="Normalized Read Depth") +
     scale_x_continuous(expand = c(0, 0), name="Position") +
     scale_y_continuous(name="Normalized Read Depth", expand = c(0, 0),
                        limits = c(0,3)) + theme_classic() +
     guides(fill = guide_legend(keywidth = 3, keyheight = 1))
- ggsave(sprintf("plots/ChrPlot_5kb.Chr%s.pdf",n),p,width=7,height=2.5)
- p
 }
-
+pdf("plots/ChrPlot_5kb.pdf")
+plts <- lapply(1:nchr,plot_chrs,data=d)
+plts
 
