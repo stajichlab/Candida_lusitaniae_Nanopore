@@ -2,7 +2,7 @@
 
 #SBATCH --mem=24gb --ntasks 16 --nodes 1
 #SBATCH --time=24:00:00
-#SBATCH -J fasalnTree --out logs/make_tree.log
+#SBATCH -J makeTree --out logs/make_tree.log
 
 CPU=2
 if [ $SLURM_CPUS_ON_NODE ]; then
