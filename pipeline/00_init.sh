@@ -15,12 +15,15 @@ module load bwa/0.7.17
 module load samtools/1.8
 module load picard
 mkdir -p logs
+if [ ! -e $GENOMENAME.fasta ]; then
+	ln -s $GENOMEFOLDER/$GENOMEFASTA $GENOMENAME.fasta
+fi
 if [ ! -f $GENOMEFOLDER/$GENOMENAME.sa ]; then
     bwa index -p $GENOMEFOLDER/$GENOMENAME $GENOMEFOLDER/$GENOMEFASTA
 fi
 
-if [ ! -e $GENOMEFOLDER/$GENOMEFASTA.fai ]; then
-	samtools faidx $GENOMEFOLDER/$GENOMEFASTA
+if [ ! -e $GENOMEFOLDER/$GENOMENAME.fai ]; then
+	samtools faidx $GENOMEFOLDER/$GENOMENAME.fasta
 fi
 
 

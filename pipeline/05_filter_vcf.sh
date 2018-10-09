@@ -1,15 +1,13 @@
 #!/usr/bin/bash
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
-#SBATCH --mem 16G
+#SBATCH --mem 16G -p short
 #SBATCH --job-name=GATK.select_filter
 #SBATCH --output=logs/GATK.select_filter.%A.log
 
 #Filters and selects for high quality variants, splitting them up into INDELONLY and SNPONLY files. Adjust filter parameters as needed
 
-module load gatk/3.7
-module unload java
-module load java/8
+module load gatk/3.8
 
 CONFIG=config.txt
 
@@ -52,9 +50,9 @@ if [ ! -f $INDEL ]; then
  -selectType INDEL -selectType MIXED -selectType MNP
 fi
 
-if [ ! -f $FILTEREDSNP ]; then
+if [ ! -f $FILTERSNP ]; then
  java -Xmx3g -jar $GATK \
- -T VariantFiltration -o $FILTEREDSNP \
+ -T VariantFiltration -o $FILTERSNP \
  --variant $SNP -R $GENOME \
  --clusterWindowSize 10  -filter "QD<2.0" -filterName QualByDepth \
  -filter "MQ<40.0" -filterName MapQual \
@@ -67,9 +65,9 @@ if [ ! -f $FILTEREDSNP ]; then
 #-filter "MQ0>=10 && ((MQ0 / (1.0 * DP)) > 0.1)" -filterName MapQualRatio \
 fi
 
-if [ ! -f $FILTEREDINDEL ]; then
+if [ ! -f $FILTERINDEL ]; then
  java -Xmx3g -jar $GATK \
- -T VariantFiltration -o $FILTEREDINDEL \
+ -T VariantFiltration -o $FILTERINDEL \
  --variant $INDEL -R $GENOME \
  --clusterWindowSize 10  -filter "QD<2.0" -filterName QualByDepth \
  -filter "MQRankSum < -12.5" -filterName MapQualityRankSum \
@@ -83,7 +81,7 @@ if [ ! -f $FINALSNP ]; then
  java -Xmx16g -jar $GATK \
    -R $GENOME \
    -T SelectVariants \
-   --variant $FILTEREDSNP \
+   --variant $FILTERSNP \
    -o $FINALSNP \
    -env \
    -ef \
@@ -94,7 +92,7 @@ if [ ! -f $FINALINDEL ]; then
  java -Xmx16g -jar $GATK \
    -R $GENOME \
    -T SelectVariants \
-   --variant $FILTEREDINDEL \
+   --variant $FILTERINDEL \
    -o $FINALINDEL \
    --excludeFiltered 
 fi
