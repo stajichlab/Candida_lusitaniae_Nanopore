@@ -19,3 +19,5 @@ WINDOW=20000
 parallel --jobs $CPU mosdepth -T 1,10,50,100,200 -n --by $WINDOW -t 2 "{= s:aln\/:coverage/mosdepth/:; s:\.realign\.bam:.${WINDOW}bp: =}" {} ::: aln/*.realign.bam
 
 bash scripts/mosdepth_prep_ggplot.sh
+mkdir -p plots
+Rscript Rscripts/plot_mosdepth_CNV.R
