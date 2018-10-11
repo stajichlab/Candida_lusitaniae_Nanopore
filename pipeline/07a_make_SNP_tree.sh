@@ -15,6 +15,10 @@ else
 	echo "Need a config.txt"
 	exit
 fi
+
+if [[ -z $REFNAME ]]; then
+	REFNAME=REF
+fi
 module load bcftools
 module load IQ-TREE
 module load fasttree
@@ -31,11 +35,11 @@ if [ ! -f $tab ]; then
 	bcftools query -H -f '%CHROM\t%POS\t%REF\t%ALT{0}[\t%TGT]\n' ${vcf} > $tab
 fi
 if [ ! -f $FAS ]; then
-    printf '>REF\n' > $FAS  
+    printf '>'$REF'\n' > $FAS  
     bcftools query -f '%REF' ${vcf} >> $FAS
     printf '\n' >> $FAS
 
-    for samp in $(bcftools query -l ${vcf} ); do
+    for samp in $(bcftools query -l ${vcf} | grep -v -P '^CL_\d+'); do
 	printf '>'${samp}'\n'
 	bcftools query -s ${samp} -f '[%TGT]' ${vcf}
 	printf '\n'
