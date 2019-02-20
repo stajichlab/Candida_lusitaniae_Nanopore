@@ -35,7 +35,7 @@ if [ ! -f $tab ]; then
 	bcftools query -H -f '%CHROM\t%POS\t%REF\t%ALT{0}[\t%TGT]\n' ${vcf} > $tab
 fi
 if [ ! -f $FAS ]; then
-    printf '>'$REF'\n' > $FAS  
+    printf '>'$REFNAME'\n' > $FAS  
     bcftools query -f '%REF' ${vcf} >> $FAS
     printf '\n' >> $FAS
 

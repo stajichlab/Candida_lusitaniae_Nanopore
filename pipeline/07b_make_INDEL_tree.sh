@@ -43,4 +43,4 @@ if [ ! -f $FAS ]; then
 fi
 
 # INDEL tree
-iqtree-omp -nt 2 -s indel_matrix.fasaln -m JC2+ASC  -b 100 -redo
+iqtree-omp -nt 2 -s indel_matrix.fasaln -m JC2 -b 100 -redo
