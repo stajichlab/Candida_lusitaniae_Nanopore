@@ -47,6 +47,11 @@ do
     if [ ! -f $tab ]; then
 	bcftools query -H -f '%CHROM\t%POS\t%REF\t%ALT{0}[\t%TGT]\n' ${vcf} > $tab
     fi
+    # I wrote a new version of this that is multithreadded if this is taking a long time 
+    # we should talk about this
+    # this replaces that as a fast way 
+    # its two steps
+    # https://github.com/stajichlab/Afum_popgenome/blob/master/variantcall/pipeline/07a_speedy_slice.sh 
     if [ ! -f $FAS ]; then
 	printf '>'$REFNAME'\n' > $FAS  
 	bcftools query -f '%REF' ${vcf} >> $FAS
