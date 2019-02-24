@@ -12,21 +12,25 @@ if [ -f $CONFIG ]; then
 fi
 
 module load bwa/0.7.17
-module load samtools/1.8
+module load samtools/1.9
 module load picard
 mkdir -p logs
-if [ ! -e $GENOMENAME.fasta ]; then
-	ln -s $GENOMEFOLDER/$GENOMEFASTA $GENOMENAME.fasta
+
+pushd $GENOMEFOLDER
+FASTAFILE=$GENOMEFASTA
+if [[ ! -f $FASTAFILE.fai || $FASTAFILE -nt $FASTAFILE.fai ]]; then
+	samtools faidx $FASTAFILE
 fi
-if [ ! -f $GENOMEFOLDER/$GENOMENAME.sa ]; then
-    bwa index -p $GENOMEFOLDER/$GENOMENAME $GENOMEFOLDER/$GENOMEFASTA
+if [[ ! -f $FASTAFILE.bwt || $FASTAFILE -nt $FASTAFILE.bwt ]]; then
+	bwa index $FASTAFILE
 fi
 
-if [ ! -e $GENOMEFOLDER/$GENOMENAME.fai ]; then
-	samtools faidx $GENOMEFOLDER/$GENOMENAME.fasta
+DICT=$(basename $FASTAFILE .fasta)".dict"
+
+if [[ ! -f $DICT || $FASTAFILE -nt $DICT ]]; then
+	rm -f $DICT
+	picard CreateSequenceDictionary R=$FASTAFILE O=$DICT
+	ln -s $DICT $FASTAFILE.dict
 fi
 
-
-if [ ! -e $GENOMEFOLDER/$GENOMENAME.dict ]; then
-    picard CreateSequenceDictionary R=$GENOMEFOLDER/$GENOMEFASTA O=$GENOMEFOLDER/$GENOMENAME.dict SPECIES=Candida_lusitaniae TRUNCATE_NAMES_AT_WHITESPACE=true
-fi
+popd

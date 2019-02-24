@@ -1,71 +1,133 @@
-#!/usr/bin/bash 
-
-#SBATCH --nodes 1 --ntasks 8 --mem 24G --out logs/aln.%a.log --time 2:00:00 -p short
-
-#This script takes a reference genome and a tab delimited sample list of: sample name\tsample_reads_1.fq\tsample_reads_2.fq.
-# For each line defined by the number in an array job, this script will align set of reads to a reference genome using bwa mem.
-#After, it uses picard to add read groups and mark duplicates. 
-
-RGCENTER=UCR
-RGPLATFORM=Illumina
-CONFIG=config.txt
-BWA=bwa
-if [ -f $CONFIG ]; then
-    source $CONFIG
-fi
-
-TEMPDIR=/scratch
+#!/usr/bin/bash
+#SBATCH --mem 32G --ntasks 8 --nodes 1 -J ClusAln
+#SBATCH --out logs/Clus.bwa.%a.log --time 8:00:00
 
 module load bwa/0.7.17
-module load picard
-module load samtools/1.8
 module unload java
 module load java/8
+module load picard
+module load gatk/3.7
 
+MEM=30g
+
+TOPOUTDIR=tmp
+ALNFOLDER=cram
+HTCEXT=cram
+HTCFORMAT=cram
+
+if [ -f config.txt ]; then
+    source config.txt
+fi
+if [ -z $REFGENOME ]; then
+    echo "NEED A REFGENOME - set in config.txt and make sure 00_index.sh is run"
+    exit
+fi
+
+if [ ! -f $REFGENOME.dict ]; then
+    echo "NEED a $REFGENOME.dict - make sure 00_index.sh is run"
+fi
+
+mkdir -p $TOPOUTDIR
+SAMPFILE=samples.csv
+TEMP=/scratch
+
+N=${SLURM_ARRAY_TASK_ID}
 CPU=1
-
-hostname
-mkdir -p $ALNFOLDER
-
-if [ $SLURM_CPUS_ON_NODE ]; then
+if [ $SLURM_CPUS_ON_NODE ]; then 
  CPU=$SLURM_CPUS_ON_NODE
 fi
-N=${SLURM_ARRAY_TASK_ID}
 
-if [ ! $N ]; then
+
+if [ -z $N ]; then
  N=$1
- if [ ! $N ]; then 
-    echo "Need a number via slurm --array or cmdline"
-    exit
- fi
 fi
 
-if [ ! $SAMPLESINFO ]; then
-    echo "need to define \$SAMPLESINFO in $CONFIG file"
-    exit
+if [ -z $N ]; then 
+ echo "need to provide a number by --array or cmdline"
+ exit
 fi
-GENOMEIDX=$GENOMEFOLDER/$GENOMENAME
-echo "$GENOMEIDX"
+
+MAX=$(wc -l $SAMPFILE | awk '{print $1}')
+echo "$N $MAX for $SAMPFILE"
+if [ $N -gt $MAX ]; then 
+ echo "$N is too big, only $MAX lines in $SAMPFILE"
+ exit
+fi
+
 IFS=,
-sed -n ${N}p $SAMPLESINFO | while read SAMPLE READ1 READ2 CTR TYPE POPULATION
+tail -n +2 $SAMPFILE | sed -n ${N}p | while read SAMPLE PAIR1 PAIR2 CTR TYPE POPULATION
 do
-    READ1=$FASTQFOLDER/$READ1
-    READ2=$FASTQFOLDER/$READ2
-    PU=$(basename $(dirname $READ1))
-    if [ -z $CTR ]; then
-	    CTR=$RGCENTER
-    fi
-    echo "SAMPLE=$SAMPLE READ1=$READ1 READ2=$READ2 center=$CTR"
-    if [ ! -f $ALNFOLDER/$SAMPLE.DD.bam ]  || [ ! -s $ALNFOLDER/$SAMPLE.DD.bam ]; then
-        if [ ! -f $ALNFOLDER/$SAMPLE.sort.bam ]; then
-            $BWA mem -M -t $CPU $GENOMEIDX $READ1 $READ2 | samtools sort -T /scratch/$SAMPLE --reference $GENOMEIDX.fasta -@ $CPU -o $ALNFOLDER/$SAMPLE.sort.bam -
-        fi
-	picard AddOrReplaceReadGroups RGID=$SAMPLE RGSM=$SAMPLE RGLB=$PU RGPL=$RGPLATFORM RGPU=$PU RGCN=$CTR I=$ALNFOLDER/$SAMPLE.sort.bam O=$ALNFOLDER/$SAMPLE.RG.bam \
-		VALIDATION_STRINGENCY=SILENT
+   # skip pool samples for now all together
+   if [[ $TYPE != "Monoisolate" ]]; then
+	   continue
+   fi
+   PAIR1=$FASTQFOLDER/$PAIR1
+   PAIR2=$FASTQFOLDER/$PAIR2
+  STRAIN=$(echo "$SAMPLE" | perl -p -e 's/ +/_/g; s/\//-/g;')
+  SAMFILE=$TOPOUTDIR/$STRAIN.unsrt.sam
+  SRTED=$TOPOUTDIR/${STRAIN}.srt.bam
+  DDFILE=$TOPOUTDIR/${STRAIN}.DD.bam
+  REALIGN=$TOPOUTDIR/${STRAIN}.realign.bam
+  INTERVALS=$TOPOUTDIR/${STRAIN}.intervals
+  FINALFILE=$ALNFOLDER/${STRAIN}.$HTCEXT    
+  CENTER=$(echo $CENTER | perl -p -e 's/ +/_/g')
+  READGROUP="@RG\tID:$STRAIN\tSM:$STRAIN\tLB:$STRAIN\tPL:illumina\tCN:$CENTER"
+  echo "RG=$READGROUP"
+  if [ ! -f $FINALFILE ]; then
+      if [ ! -f $DDFILE ]; then
+	  if [ ! -f $SRTED ]; then
+	      if [ -e $PAIR2 ]; then
+		  echo "RUNNING paired-end bwa"
+		  bwa mem -t $CPU -R $READGROUP $REFGENOME $PAIR1 $PAIR2 > $SAMFILE
+		  samtools fixmate --threads $CPU -O bam $SAMFILE $TEMP/${RUN}.fixmate.bam
+		  samtools sort --threads $CPU -O bam -o  $SRTED -T $TEMP $TEMP/${RUN}.fixmate.bam
+		  /usr/bin/rm $TEMP/${RUN}.fixmate.bam $SAMFILE
+	      elif [ -e $PAIR1 ]; then
+		  echo "RUNNING unpaired bwa"
+    		  bwa mem -t $CPU -R $READGROUP $REFGENOME $PAIR1 | samtools sort -@ $CPU -O bam -T $TEMP -o $SRTED
+	      else
+		  echo "NO $PAIR1 and no $PAIR2?"
+		  exit
+	      fi
+	  fi # SRTED file exists or was created by this block
+	  
+	  echo "picard MarkDuplicates I=$SRTED O=$DDFILE \
+	      METRICS_FILE=logs/$RUN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null"
 
-        picard MarkDuplicates I=$ALNFOLDER/$SAMPLE.RG.bam O=$ALNFOLDER/$SAMPLE.DD.bam \
-            METRICS_FILE=$ALNFOLDER/$SAMPLE.dedup.metrics VALIDATION_STRINGENCY=SILENT CREATE_INDEX=true
-
-	unlink $ALNFOLDER/$SAMPLE.RG.bam
-    fi
+	  picard MarkDuplicates I=$SRTED O=$DDFILE \
+	      METRICS_FILE=logs/$RUN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null
+	  if [ -f $DDFILE ]; then
+	      rm -f $SRTED
+	  fi
+	  if [ ! -f $DDFILE.bai ]; then
+	      picard BuildBamIndex I=$DDFILE TMP_DIR=/scratch
+	  fi	    
+      fi # DDFILE is created after this or already exists
+      
+      if [ ! -f $INTERVALS ]; then 
+	  time java -Xmx$MEM -jar $GATK \
+	      -T RealignerTargetCreator \
+	      -R $REFGENOME \
+	      -I $DDFILE \
+	      -o $INTERVALS
+      fi
+      if [ ! -f $REALIGN ]; then
+	  time java -Xmx$MEM -jar $GATK \
+	      -T IndelRealigner \
+	      -R $REFGENOME \
+	      -I $DDFILE \
+	      -targetIntervals $INTERVALS \
+	      -o $REALIGN
+      fi
+      
+      samtools view -O $HTCFORMAT --threads $CPU \
+	  --reference $REFGENOME -o $FINALFILE $REALIGN
+      samtools index $FINALFILE
+      if [ -f $FINALFILE ]; then
+	  rm -f $DDFILE $REALIGN
+	  rm -f $(echo $REALIGN | sed 's/bam$/bai/')
+	  rm -f $(echo $DDFILE | sed 's/bam$/bai/')
+	  rm -f $INTERVALS
+      fi
+    fi #FINALFILE created or already exists  
 done
