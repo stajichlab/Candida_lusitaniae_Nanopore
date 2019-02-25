@@ -7,8 +7,9 @@ module unload java
 module load java/8
 module load picard
 module load gatk/3.7
-
-MEM=30g
+module load samtools/1.9
+module load bcftools/1.9
+MEM=32g
 
 TOPOUTDIR=tmp
 ALNFOLDER=cram
@@ -59,6 +60,7 @@ tail -n +2 $SAMPFILE | sed -n ${N}p | while read SAMPLE PAIR1 PAIR2 CTR TYPE POP
 do
    # skip pool samples for now all together
    if [[ $TYPE != "Monoisolate" ]]; then
+	   echo "skipping because type is $TYPE"
 	   continue
    fi
    PAIR1=$FASTQFOLDER/$PAIR1
@@ -70,7 +72,7 @@ do
   REALIGN=$TOPOUTDIR/${STRAIN}.realign.bam
   INTERVALS=$TOPOUTDIR/${STRAIN}.intervals
   FINALFILE=$ALNFOLDER/${STRAIN}.$HTCEXT    
-  CENTER=$(echo $CENTER | perl -p -e 's/ +/_/g')
+  CENTER=$(echo $CTR | perl -p -e 's/ +/_/g')
   READGROUP="@RG\tID:$STRAIN\tSM:$STRAIN\tLB:$STRAIN\tPL:illumina\tCN:$CENTER"
   echo "RG=$READGROUP"
   if [ ! -f $FINALFILE ]; then
@@ -79,9 +81,9 @@ do
 	      if [ -e $PAIR2 ]; then
 		  echo "RUNNING paired-end bwa"
 		  bwa mem -t $CPU -R $READGROUP $REFGENOME $PAIR1 $PAIR2 > $SAMFILE
-		  samtools fixmate --threads $CPU -O bam $SAMFILE $TEMP/${RUN}.fixmate.bam
-		  samtools sort --threads $CPU -O bam -o  $SRTED -T $TEMP $TEMP/${RUN}.fixmate.bam
-		  /usr/bin/rm $TEMP/${RUN}.fixmate.bam $SAMFILE
+		  samtools fixmate --threads $CPU -O bam $SAMFILE $TEMP/${STRAIN}.fixmate.bam
+		  samtools sort --threads $CPU -O bam -o  $SRTED -T $TEMP $TEMP/${STRAIN}.fixmate.bam
+		  /usr/bin/rm $TEMP/${STRAIN}.fixmate.bam $SAMFILE
 	      elif [ -e $PAIR1 ]; then
 		  echo "RUNNING unpaired bwa"
     		  bwa mem -t $CPU -R $READGROUP $REFGENOME $PAIR1 | samtools sort -@ $CPU -O bam -T $TEMP -o $SRTED
@@ -92,10 +94,10 @@ do
 	  fi # SRTED file exists or was created by this block
 	  
 	  echo "picard MarkDuplicates I=$SRTED O=$DDFILE \
-	      METRICS_FILE=logs/$RUN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null"
+	      METRICS_FILE=logs/$STRAIN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null"
 
 	  picard MarkDuplicates I=$SRTED O=$DDFILE \
-	      METRICS_FILE=logs/$RUN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null
+	      METRICS_FILE=logs/$STRAIN.dedup.metrics CREATE_INDEX=true VALIDATION_STRINGENCY=SILENT READ_NAME_REGEX=null
 	  if [ -f $DDFILE ]; then
 	      rm -f $SRTED
 	  fi
