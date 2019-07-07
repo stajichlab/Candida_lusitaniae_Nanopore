@@ -8,7 +8,7 @@
 #Filters and selects for high quality variants, splitting them up into INDELONLY and SNPONLY files. Adjust filter parameters as needed
 
 module load gatk/3.8
-
+module load tabix
 CONFIG=config.txt
 
 if [[ -f $CONFIG ]]; then
@@ -76,6 +76,7 @@ if [ ! -f $FILTERINDEL ]; then
  -filter "InbreedingCoeff<-0.8" -filterName InbreedCoef \
  -filter "ReadPosRankSum<-20.0" -filterName ReadPosRank 
 fi
+if [ ! -f  $FINALSNP.gz ]; then
 
 if [ ! -f $FINALSNP ]; then
  java -Xmx16g -jar $GATK \
@@ -87,6 +88,11 @@ if [ ! -f $FINALSNP ]; then
    -ef \
    --excludeFiltered
 fi
+bgzip $FINALSNP
+tabix $FINALSNP.gz
+fi
+
+if [ ! -f $FINALINDEL.gz ]; then
 
 if [ ! -f $FINALINDEL ]; then
  java -Xmx16g -jar $GATK \
@@ -96,4 +102,6 @@ if [ ! -f $FINALINDEL ]; then
    -o $FINALINDEL \
    --excludeFiltered 
 fi
+bgzip $FINALINDEL
+tabix $FINALINDEL.gz
 

@@ -56,8 +56,9 @@ if [ $N -gt $MAX ]; then
 fi
 
 IFS=,
-tail -n +2 $SAMPFILE | sed -n ${N}p | while read SAMPLE PAIR1 PAIR2 CTR TYPE POPULATION
+cat $SAMPFILE | sed -n ${N}p | while read SAMPLE PAIR1 PAIR2 CTR TYPE POPULATION
 do
+	echo "processing $SAMPLE $PAIR1 from file ($N)"
    # skip pool samples for now all together
    if [[ $TYPE != "Monoisolate" ]]; then
 	   echo "skipping because type is $TYPE"
@@ -131,5 +132,7 @@ do
 	  rm -f $(echo $DDFILE | sed 's/bam$/bai/')
 	  rm -f $INTERVALS
       fi
+    else
+	echo "$FINALFILE already exists"
     fi #FINALFILE created or already exists  
 done
