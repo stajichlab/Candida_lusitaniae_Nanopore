@@ -1,6 +1,7 @@
 GENOMEFOLDER=genome
 GENOMEFASTA=C_lusitaniae_L1B.pilon.v1.fasta
 REFGENOME=genome/C_lusitaniae_L1B.pilon.v1.fasta
+SNPEFFGENOME=Clus_L1B
 GENOMENAME=Clus_L1B
 SAMPLESINFO=samples.csv
 FASTQFOLDER=fastq
@@ -16,5 +17,5 @@ RGCENTER=UCR
 RGPLATFORM=Illumina
 GATKVERSION=3
 FINALVCF=vcf
-PREFIX=ClusNanoL1B
+PREFIX=ClusNanoL1B_201906
 REFNAME=L1B_Nanopore
