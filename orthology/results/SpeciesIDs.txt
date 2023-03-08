@@ -1,0 +1,2 @@
+0: Clus_ATCC42720.fa
+1: Clus_L17.fa
